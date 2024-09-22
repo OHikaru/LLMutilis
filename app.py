@@ -190,24 +190,22 @@ def process_content(content, api_key, user_prompt, model_name, is_image=False):
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
         if is_image:
-            # 画像データをバイト列に変換
-            img_byte_arr = io.BytesIO()
-            content.save(img_byte_arr, format='PNG')
-            img_byte_arr = img_byte_arr.getvalue()
-            response = model.generate_content([IMAGE_META_PROMPT.format(user_prompt=user_prompt, content=""), img_byte_arr])
+            response = model.generate_content([IMAGE_META_PROMPT.format(user_prompt=user_prompt, content=content)])
         else:
             response = model.generate_content([TEXT_META_PROMPT.format(user_prompt=user_prompt, content=content)])
         return response.text
     elif "gpt" in model_name or model_name in ["chatgpt-4o-latest"] or "o1" in model_name:
         os.environ["OPENAI_API_KEY"] = api_key
         if "o1" in model_name:
-            llm = ChatOpenAI(model_name=model_name, temperature=1.0)
+            # o1シリーズの場合、META_PROMPTを使用せず、直接contentを処理
+            llm = ChatOpenAI(model_name=model_name, temperature=temperature)
             response = llm.predict(user_prompt + "\n\n" + content)
         else:
+            # その他のOpenAIモデルの場合、META_PROMPTを使用
             if "gpt-3.5" in model_name or "gpt-4" in model_name or model_name == "chatgpt-4o-latest":
-                llm = ChatOpenAI(model_name=model_name, temperature=1.0)
+                llm = ChatOpenAI(model_name=model_name, temperature=temperature)
             else:
-                llm = OpenAI(model_name=model_name, temperature=1.0)
+                llm = OpenAI(model_name=model_name, temperature=temperature)
             if is_image:
                 prompt_template = PromptTemplate(input_variables=["user_prompt", "content"], template=IMAGE_META_PROMPT)
             else:
@@ -257,8 +255,6 @@ def main():
 
     # 入力フォーム
     st.session_state.api_key_type = st.radio("APIキーの種類を選択してください。OCRは2024年9月現在ではGeminiのみ対応しています", ("Gemini", "OpenAI"))
-    
-    # APIキーの入力
     st.session_state.api_key = st.text_input(f"{st.session_state.api_key_type} APIキーを入力してください", type="password", value=st.session_state.api_key)
 
     # APIキーの種類に基づいてモデルリストを選択
@@ -291,8 +287,9 @@ def main():
         if uploaded_file is not None and st.session_state.api_key:
             file_type = uploaded_file.type
             if file_type.startswith('image'):
-                st.session_state.content = Image.open(uploaded_file)
-                st.image(st.session_state.content, caption='アップロードされた画像', use_column_width=True)
+                image = Image.open(uploaded_file)
+                st.image(image, caption='アップロードされた画像', use_column_width=True)
+                st.session_state.content = image
                 is_image = True
             elif file_type == 'application/pdf':
                 st.session_state.content = extract_text_from_pdf(uploaded_file)
