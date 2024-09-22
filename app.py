@@ -190,7 +190,11 @@ def process_content(content, api_key, user_prompt, model_name, is_image=False):
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name)
         if is_image:
-            response = model.generate_content([IMAGE_META_PROMPT.format(user_prompt=user_prompt, content=content)])
+            # 画像データをバイト列に変換
+            img_byte_arr = io.BytesIO()
+            content.save(img_byte_arr, format='PNG')
+            img_byte_arr = img_byte_arr.getvalue()
+            response = model.generate_content([IMAGE_META_PROMPT.format(user_prompt=user_prompt, content=""), img_byte_arr])
         else:
             response = model.generate_content([TEXT_META_PROMPT.format(user_prompt=user_prompt, content=content)])
         return response.text
@@ -289,9 +293,11 @@ def main():
             if file_type.startswith('image'):
                 st.session_state.content = Image.open(uploaded_file)
                 st.image(st.session_state.content, caption='アップロードされた画像', use_column_width=True)
+                is_image = True
             elif file_type == 'application/pdf':
                 st.session_state.content = extract_text_from_pdf(uploaded_file)
                 st.text(f"PDFの内容（プレビュー）:\n{st.session_state.content[:500]}...")
+                is_image = False
             else:
                 st.error("サポートされていないファイル形式です。画像またはPDFをアップロードしてください。")
                 st.stop()
@@ -299,7 +305,7 @@ def main():
             if st.button('処理開始'):
                 with st.spinner('処理中...'):
                     try:
-                        result = process_content(st.session_state.content, st.session_state.api_key, initial_prompt, st.session_state.selected_model, is_image=True)
+                        result = process_content(st.session_state.content, st.session_state.api_key, initial_prompt, st.session_state.selected_model, is_image=is_image)
                         st.session_state.results.append({"result": result, "prompt": initial_prompt, "model": st.session_state.selected_model})
                         st.session_state.iteration += 1
                     except Exception as e:
