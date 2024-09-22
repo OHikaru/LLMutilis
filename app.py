@@ -287,14 +287,11 @@ def main():
         if uploaded_file is not None and st.session_state.api_key:
             file_type = uploaded_file.type
             if file_type.startswith('image'):
-                image = Image.open(uploaded_file)
-                st.image(image, caption='アップロードされた画像', use_column_width=True)
-                st.session_state.content = image
-                is_image = True
+                st.session_state.content = Image.open(uploaded_file)
+                st.image(st.session_state.content, caption='アップロードされた画像', use_column_width=True)
             elif file_type == 'application/pdf':
                 st.session_state.content = extract_text_from_pdf(uploaded_file)
                 st.text(f"PDFの内容（プレビュー）:\n{st.session_state.content[:500]}...")
-                is_image = False
             else:
                 st.error("サポートされていないファイル形式です。画像またはPDFをアップロードしてください。")
                 st.stop()
@@ -302,7 +299,7 @@ def main():
             if st.button('処理開始'):
                 with st.spinner('処理中...'):
                     try:
-                        result = process_content(st.session_state.content, st.session_state.api_key, initial_prompt, st.session_state.selected_model, is_image=is_image)
+                        result = process_content(st.session_state.content, st.session_state.api_key, initial_prompt, st.session_state.selected_model, is_image=True)
                         st.session_state.results.append({"result": result, "prompt": initial_prompt, "model": st.session_state.selected_model})
                         st.session_state.iteration += 1
                     except Exception as e:
