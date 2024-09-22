@@ -332,17 +332,18 @@ def main():
         st.subheader("Results")
         for i, result_data in enumerate(st.session_state.results):
             with st.expander(f"Result {i+1} (Model: {result_data['model']})"):
-                st.text_area(f"Output", result_data["result"], height=200)
+                st.text_area(f"Output", result_data["result"], height=200, key=f"output_{i}")
                 
                 csv_result = clean_csv(result_data["result"])
                 st.download_button(
                     label=f"Download as CSV",
                     data=csv_result,
                     file_name=f"result_{i+1}.csv",
-                    mime="text/csv"
+                    mime="text/csv",
+                    key=f"download_{i}"
                 )
 
-                additional_prompt = st.text_area("Enter additional instructions")
+                additional_prompt = st.text_area("Enter additional instructions", key=f"additional_prompt_{i}")
                 reprocess_button = st.button('Reprocess', key=f"reprocess_{i}")
                 
                 if reprocess_button:
@@ -353,6 +354,21 @@ def main():
                                 st.session_state.results.append({"result": new_result, "prompt": additional_prompt, "model": st.session_state.selected_model})
                         except Exception as e:
                             st.error(f"An error occurred: {str(e)}")
+
+    # 新しい結果を表示するためのコードをループの外に移動
+    if st.session_state.results:
+        st.subheader("Latest Result")
+        latest_result = st.session_state.results[-1]
+        st.text_area("Output", latest_result["result"], height=200, key="latest_output")
+        
+        csv_result = clean_csv(latest_result["result"])
+        st.download_button(
+            label="Download Latest as CSV",
+            data=csv_result,
+            file_name="latest_result.csv",
+            mime="text/csv",
+            key="download_latest"
+        )
 
 if __name__ == "__main__":
     main()
