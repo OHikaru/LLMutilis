@@ -185,34 +185,54 @@ TEXT_META_PROMPT = """
 
 temperature=1.0 #temperatureを指定
 
-def process_content(content, api_key, user_prompt, model_name, is_image=False):
-    if "gemini" in model_name:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
+def setup_gemini_model(api_key, model_name):
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(model_name)
+
+def setup_openai_model(api_key):
+    return OpenAI(api_key=api_key)
+
+def process_with_gemini(model, content, prompt, is_image):
+    try:
         if is_image:
-            response = model.generate_content([IMAGE_META_PROMPT.format(user_prompt=user_prompt, content=content)])
+            response = model.generate_content([IMAGE_META_PROMPT, content])
         else:
-            response = model.generate_content([TEXT_META_PROMPT.format(user_prompt=user_prompt, content=content)])
+            response = model.generate_content(TEXT_META_PROMPT + "\n\n" + content)
         return response.text
-    elif "gpt" in model_name or model_name in ["chatgpt-4o-latest"] or "o1" in model_name:
-        os.environ["OPENAI_API_KEY"] = api_key
-        if "o1" in model_name:
-            # o1シリーズの場合、META_PROMPTを使用せず、直接contentを処理
-            llm = ChatOpenAI(model_name=model_name, temperature=temperature)
-            response = llm.predict(user_prompt + "\n\n" + content)
+    except Exception as e:
+        st.error(f"Error processing with Gemini: {str(e)}")
+        return None
+
+def process_with_openai(client, content, prompt, is_image, model_name):
+    try:
+        if is_image:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": IMAGE_META_PROMPT},
+                    {"role": "user", "content": [{"type": "image_url", "image_url": {"url": content}}]}
+                ]
+            )
         else:
-            # その他のOpenAIモデルの場合、META_PROMPTを使用
-            if "gpt-3.5" in model_name or "gpt-4" in model_name or model_name == "chatgpt-4o-latest":
-                llm = ChatOpenAI(model_name=model_name, temperature=temperature)
-            else:
-                llm = OpenAI(model_name=model_name, temperature=temperature)
-            if is_image:
-                prompt_template = PromptTemplate(input_variables=["user_prompt", "content"], template=IMAGE_META_PROMPT)
-            else:
-                prompt_template = PromptTemplate(input_variables=["user_prompt", "content"], template=TEXT_META_PROMPT)
-            chain = LLMChain(llm=llm, prompt=prompt_template)
-            response = chain.run(user_prompt=user_prompt, content=content)
-        return response
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": TEXT_META_PROMPT},
+                    {"role": "user", "content": content}
+                ]
+            )
+        return response.choices[0].message.content
+    except Exception as e:
+        st.error(f"Error processing with OpenAI: {str(e)}")
+        return None
+
+def process_content(content, api_key, prompt, model_name, is_image):
+    if "gemini" in model_name.lower():
+        model = setup_gemini_model(api_key, model_name)
+        return process_with_gemini(model, content, prompt, is_image)
+    elif "gpt" in model_name.lower():
+        client = setup_openai_model(api_key)
+        return process_with_openai(client, content, prompt, is_image, model_name)
     else:
         raise ValueError(f"Unsupported model: {model_name}")
 
@@ -235,105 +255,104 @@ def extract_text_from_pdf(pdf_file):
     return text
 
 def main():
-    st.title('AI文書処理・質問応答システム')
+    st.set_page_config(page_title="AI Document Processor", page_icon="📄", layout="wide")
+    st.title('AI Document Processing & Q&A System')
 
-    # セッション状態の初期化
+    # Initialize session state
     if 'content' not in st.session_state:
         st.session_state.content = None
     if 'results' not in st.session_state:
         st.session_state.results = []
-    if 'iteration' not in st.session_state:
-        st.session_state.iteration = 0
     if 'api_key' not in st.session_state:
         st.session_state.api_key = ""
     if 'selected_model' not in st.session_state:
         st.session_state.selected_model = GEMINI_MODELS[0]
-    if 'api_key_type' not in st.session_state:
-        st.session_state.api_key_type = "Gemini"
-    if 'input_type' not in st.session_state:
-        st.session_state.input_type = "テキスト"
 
-    # 入力フォーム
-    st.session_state.api_key_type = st.radio("APIキーの種類を選択してください。OCRは2024年9月現在ではGeminiのみ対応しています", ("Gemini", "OpenAI"))
-    st.session_state.api_key = st.text_input(f"{st.session_state.api_key_type} APIキーを入力してください", type="password", value=st.session_state.api_key)
+    # Sidebar for configuration
+    with st.sidebar:
+        st.header("Configuration")
+        api_key_type = st.radio("Select API Key Type", ("Gemini", "OpenAI"))
+        api_key = st.text_input(f"{api_key_type} API Key", type="password", value=st.session_state.api_key)
+        
+        models = GEMINI_MODELS if api_key_type == "Gemini" else OPENAI_MODELS
+        selected_model = st.selectbox("Select AI Model", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
+        
+        st.session_state.api_key = api_key
+        st.session_state.selected_model = selected_model
 
-    # APIキーの種類に基づいてモデルリストを選択
-    if st.session_state.api_key_type == "Gemini":
-        models = GEMINI_MODELS
-    else:
-        models = OPENAI_MODELS
+    # Main content area
+    col1, col2 = st.columns(2)
 
-    # モデル選択のセレクトボックスを更新
-    st.session_state.selected_model = st.selectbox("AIモデルを選択してください。o1モデルはテキストのみ対応しています。", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
+    with col1:
+        st.subheader("Input")
+        input_type = st.radio("Select Input Type", ("Text", "Image/PDF"))
 
-    # 入力タイプの選択
-    st.session_state.input_type = st.radio("入力タイプを選択してください", ("テキスト", "画像/PDF"))
-
-    if st.session_state.input_type == "テキスト":
-        user_input = st.text_area("質問または処理したいテキストを入力してください")
-        if user_input and st.session_state.api_key:
-            if st.button('処理開始'):
-                with st.spinner('処理中...'):
+        if input_type == "Text":
+            user_input = st.text_area("Enter your question or text to process")
+            process_button = st.button('Process Text')
+            
+            if process_button and user_input and st.session_state.api_key:
+                with st.spinner('Processing...'):
                     try:
                         result = process_content(user_input, st.session_state.api_key, "", st.session_state.selected_model, is_image=False)
-                        st.session_state.results.append({"result": result, "prompt": user_input, "model": st.session_state.selected_model})
-                        st.session_state.iteration += 1
+                        if result:
+                            st.session_state.results.append({"result": result, "prompt": user_input, "model": st.session_state.selected_model})
                     except Exception as e:
-                        st.error(f"エラーが発生しました: {str(e)}")
-    else:
-        initial_prompt = st.text_area("初期の追加指示があれば入力してください（オプション）", "")
-        uploaded_file = st.file_uploader("画像またはPDFファイルを選択してください。\n\n最小解像度: 300 DPI (dots per inch) または 1200 x 1600 ピクセル程度\n\n推奨解像度: 400-600 DPI または 1600 x 2400 ピクセルから 2400 x 3600 ピクセル程度", type=["jpg", "jpeg", "png", "pdf"])
+                        st.error(f"An error occurred: {str(e)}")
+        else:
+            initial_prompt = st.text_area("Enter initial instructions (optional)")
+            uploaded_file = st.file_uploader("Choose an image or PDF file", type=["jpg", "jpeg", "png", "pdf"])
 
-        if uploaded_file is not None and st.session_state.api_key:
-            file_type = uploaded_file.type
-            if file_type.startswith('image'):
-                st.session_state.content = Image.open(uploaded_file)
-                st.image(st.session_state.content, caption='アップロードされた画像', use_column_width=True)
-            elif file_type == 'application/pdf':
-                st.session_state.content = extract_text_from_pdf(uploaded_file)
-                st.text(f"PDFの内容（プレビュー）:\n{st.session_state.content[:500]}...")
-            else:
-                st.error("サポートされていないファイル形式です。画像またはPDFをアップロードしてください。")
-                st.stop()
+            if uploaded_file:
+                if uploaded_file.type.startswith('image'):
+                    image = Image.open(uploaded_file)
+                    st.image(image, caption='Uploaded Image', use_column_width=True)
+                    st.session_state.content = image
+                    is_image = True
+                elif uploaded_file.type == 'application/pdf':
+                    st.session_state.content = extract_text_from_pdf(uploaded_file)
+                    st.text(f"PDF Content (Preview):\n{st.session_state.content[:500]}...")
+                    is_image = False
+                else:
+                    st.error("Unsupported file format. Please upload an image or PDF.")
+                    st.stop()
 
-            if st.button('処理開始'):
-                with st.spinner('処理中...'):
-                    try:
-                        result = process_content(st.session_state.content, st.session_state.api_key, initial_prompt, st.session_state.selected_model, is_image=True)
-                        st.session_state.results.append({"result": result, "prompt": initial_prompt, "model": st.session_state.selected_model})
-                        st.session_state.iteration += 1
-                    except Exception as e:
-                        st.error(f"エラーが発生しました: {str(e)}")
+                process_button = st.button('Process File')
+                
+                if process_button and st.session_state.api_key:
+                    with st.spinner('Processing...'):
+                        try:
+                            result = process_content(st.session_state.content, st.session_state.api_key, initial_prompt, st.session_state.selected_model, is_image=is_image)
+                            if result:
+                                st.session_state.results.append({"result": result, "prompt": initial_prompt, "model": st.session_state.selected_model})
+                        except Exception as e:
+                            st.error(f"An error occurred: {str(e)}")
 
-    for i, result_data in enumerate(st.session_state.results):
-        st.subheader(f"処理結果 (イテレーション {i+1})")
-        st.text(f"使用モデル: {result_data['model']}")
-        st.text_area(f"出力 {i+1}", result_data["result"], height=300, key=f"result_{i}")
+    with col2:
+        st.subheader("Results")
+        for i, result_data in enumerate(st.session_state.results):
+            with st.expander(f"Result {i+1} (Model: {result_data['model']})"):
+                st.text_area(f"Output", result_data["result"], height=200)
+                
+                csv_result = clean_csv(result_data["result"])
+                st.download_button(
+                    label=f"Download as CSV",
+                    data=csv_result,
+                    file_name=f"result_{i+1}.csv",
+                    mime="text/csv"
+                )
 
-        csv_result = clean_csv(result_data["result"])
-        st.download_button(
-            label=f"CSVダウンロード (イテレーション {i+1})",
-            data=csv_result,
-            file_name=f"result_iteration_{i+1}.csv",
-            mime="text/csv",
-            key=f"download_{i}"
-        )
-
-        additional_prompt = st.text_area("追加の指示を入力してください", key=f"prompt_{i}")
-        selected_model = st.selectbox(f"AIモデルを選択してください (イテレーション {i+2})", models, index=models.index(result_data['model']) if result_data['model'] in models else 0, key=f"model_{i}")
-
-        if st.button('再実行', key=f"rerun_{i}"):
-            with st.spinner('再処理中...'):
-                try:
-                    new_result = process_content(st.session_state.content if st.session_state.input_type == "画像/PDF" else result_data["result"],
-                                                 st.session_state.api_key,
-                                                 additional_prompt,
-                                                 selected_model,
-                                                 is_image=(st.session_state.input_type == "画像/PDF"))
-                    st.session_state.results.append({"result": new_result, "prompt": additional_prompt, "model": selected_model})
-                    st.session_state.iteration += 1
-                except Exception as e:
-                    st.error(f"エラーが発生しました: {str(e)}")
+                additional_prompt = st.text_area("Enter additional instructions")
+                reprocess_button = st.button('Reprocess', key=f"reprocess_{i}")
+                
+                if reprocess_button:
+                    with st.spinner('Reprocessing...'):
+                        try:
+                            new_result = process_content(result_data["result"], st.session_state.api_key, additional_prompt, st.session_state.selected_model, is_image=False)
+                            if new_result:
+                                st.session_state.results.append({"result": new_result, "prompt": additional_prompt, "model": st.session_state.selected_model})
+                        except Exception as e:
+                            st.error(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     main()
