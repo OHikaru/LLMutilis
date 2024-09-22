@@ -243,7 +243,7 @@ def main():
     if 'iteration' not in st.session_state:
         st.session_state.iteration = 0
     if 'api_key' not in st.session_state:
-        st.session_state.api_key = st.secrets["api_keys"]["default"]
+        st.session_state.api_key = ""
     if 'selected_model' not in st.session_state:
         st.session_state.selected_model = GEMINI_MODELS[0]
     if 'api_key_type' not in st.session_state:
@@ -253,14 +253,15 @@ def main():
 
     # 入力フォーム
     st.session_state.api_key_type = st.radio("APIキーの種類を選択してください。OCRは2024年9月現在ではGeminiのみ対応しています", ("Gemini", "OpenAI"))
+    
+    # APIキーの入力
+    st.session_state.api_key = st.text_input(f"{st.session_state.api_key_type} APIキーを入力してください", type="password", value=st.session_state.api_key)
 
     # APIキーの種類に基づいてモデルリストを選択
     if st.session_state.api_key_type == "Gemini":
         models = GEMINI_MODELS
-        st.session_state.api_key = st.secrets["api_keys"]["gemini"]
     else:
         models = OPENAI_MODELS
-        st.session_state.api_key = st.secrets["api_keys"]["openai"]
 
     # モデル選択のセレクトボックスを更新
     st.session_state.selected_model = st.selectbox("AIモデルを選択してください。o1モデルはテキストのみ対応しています。", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
