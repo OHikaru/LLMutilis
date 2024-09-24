@@ -237,15 +237,34 @@ def process_content(content, api_key, prompt, model_name, is_image):
         raise ValueError(f"Unsupported model: {model_name}")
 
 def clean_csv(csv_str):
-    lines = [line.strip() for line in csv_str.split('\n') if line.strip()]
-    csv_reader = csv.reader(lines)
-    cleaned_rows = list(csv_reader)
+    try:
+        # 入力文字列をSHIFT-JISでエンコード
+        csv_bytes = csv_str.encode('shift_jis')
+        
+        # バイト列からSHIFT-JISでデコード
+        csv_str = csv_bytes.decode('shift_jis')
+        
+        lines = [line.strip() for line in csv_str.split('\n') if line.strip()]
+        csv_reader = csv.reader(lines)
+        cleaned_rows = list(csv_reader)
 
-    output = io.StringIO()
-    csv_writer = csv.writer(output)
-    csv_writer.writerows(cleaned_rows)
+        output = io.StringIO()
+        csv_writer = csv.writer(output)
+        csv_writer.writerows(cleaned_rows)
 
-    return output.getvalue()
+        # StringIOの内容をSHIFT-JISでエンコード
+        result_bytes = output.getvalue().encode('shift_jis')
+        
+        return result_bytes
+    except UnicodeEncodeError:
+        print("エンコーディングエラー: 入力データをSHIFT-JISに変換できません。")
+        return None
+    except UnicodeDecodeError:
+        print("デコードエラー: 入力データをSHIFT-JISとして解釈できません。")
+        return None
+    except Exception as e:
+        print(f"予期せぬエラーが発生しました: {str(e)}")
+        return None
 
 def extract_text_from_pdf(pdf_file):
     pdf_reader = PdfReader(pdf_file)
