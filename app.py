@@ -1,4 +1,3 @@
-
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
@@ -278,8 +277,8 @@ def extract_text_from_pdf(pdf_file):
     return text
 
 def main():
-    st.set_page_config(page_title="AI Document Processor", page_icon="📄", layout="wide")
-    st.title('AI Document Processing & Q&A System')
+    st.set_page_config(page_title="AIドキュメント処理システム", page_icon="📄", layout="wide")
+    st.title('AIドキュメント処理 & Q&Aシステム')
 
     # Initialize session state
     if 'content' not in st.session_state:
@@ -293,12 +292,12 @@ def main():
 
     # Sidebar for configuration
     with st.sidebar:
-        st.header("Configuration")
-        api_key_type = st.radio("Select API Key Type", ("Gemini", "OpenAI"))
-        api_key = st.text_input(f"{api_key_type} API Key", type="password", value=st.session_state.api_key)
+        st.header("設定")
+        api_key_type = st.radio("APIキーの種類を選択", ("Gemini", "OpenAI"))
+        api_key = st.text_input(f"{api_key_type} APIキー", type="password", value=st.session_state.api_key)
         
         models = GEMINI_MODELS if api_key_type == "Gemini" else OPENAI_MODELS
-        selected_model = st.selectbox("Select AI Model", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
+        selected_model = st.selectbox("AIモデルを選択", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
         
         st.session_state.api_key = api_key
         st.session_state.selected_model = selected_model
@@ -307,86 +306,86 @@ def main():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Input")
-        input_type = st.radio("Select Input Type", ("Text", "Image/PDF"))
+        st.subheader("入力")
+        input_type = st.radio("入力タイプを選択", ("テキスト", "画像/PDF"))
 
-        if input_type == "Text":
-            user_input = st.text_area("Enter your question or text to process")
-            process_button = st.button('Process Text')
+        if input_type == "テキスト":
+            user_input = st.text_area("質問や処理したいテキストを入力してください")
+            process_button = st.button('テキストを処理')
             
             if process_button and user_input and st.session_state.api_key:
-                with st.spinner('Processing...'):
+                with st.spinner('処理中...'):
                     try:
                         result = process_content(user_input, st.session_state.api_key, "", st.session_state.selected_model, is_image=False)
                         if result:
                             st.session_state.results.append({"result": result, "prompt": user_input, "model": st.session_state.selected_model})
                     except Exception as e:
-                        st.error(f"An error occurred: {str(e)}")
+                        st.error(f"エラーが発生しました: {str(e)}")
         else:
-            initial_prompt = st.text_area("Enter initial instructions (optional)")
-            uploaded_file = st.file_uploader("Choose an image or PDF file", type=["jpg", "jpeg", "png", "pdf"])
+            initial_prompt = st.text_area("初期指示を入力（任意）")
+            uploaded_file = st.file_uploader("画像またはPDFファイルを選択", type=["jpg", "jpeg", "png", "pdf"])
 
             if uploaded_file:
                 if uploaded_file.type.startswith('image'):
                     image = Image.open(uploaded_file)
-                    st.image(image, caption='Uploaded Image', use_column_width=True)
+                    st.image(image, caption='アップロードされた画像', use_column_width=True)
                     st.session_state.content = image
                     is_image = True
                 elif uploaded_file.type == 'application/pdf':
                     st.session_state.content = extract_text_from_pdf(uploaded_file)
-                    st.text(f"PDF Content (Preview):\n{st.session_state.content[:500]}...")
+                    st.text(f"PDFの内容（プレビュー）:\n{st.session_state.content[:500]}...")
                     is_image = False
                 else:
-                    st.error("Unsupported file format. Please upload an image or PDF.")
+                    st.error("対応していないファイル形式です。画像またはPDFをアップロードしてください。")
                     st.stop()
 
-                process_button = st.button('Process File')
+                process_button = st.button('ファイルを処理')
                 
                 if process_button and st.session_state.api_key:
-                    with st.spinner('Processing...'):
+                    with st.spinner('処理中...'):
                         try:
                             result = process_content(st.session_state.content, st.session_state.api_key, initial_prompt, st.session_state.selected_model, is_image=is_image)
                             if result:
                                 st.session_state.results.append({"result": result, "prompt": initial_prompt, "model": st.session_state.selected_model})
                         except Exception as e:
-                            st.error(f"An error occurred: {str(e)}")
+                            st.error(f"エラーが発生しました: {str(e)}")
 
     with col2:
-        st.subheader("Results")
+        st.subheader("結果")
         for i, result_data in enumerate(st.session_state.results):
-            with st.expander(f"Result {i+1} (Model: {result_data['model']})"):
-                st.text_area(f"Output", result_data["result"], height=200, key=f"output_{i}")
+            with st.expander(f"結果 {i+1} (モデル: {result_data['model']})"):
+                st.text_area(f"出力", result_data["result"], height=200, key=f"output_{i}")
                 
                 csv_result = clean_csv(result_data["result"])
                 st.download_button(
-                    label=f"Download as CSV",
+                    label=f"CSVとしてダウンロード",
                     data=csv_result,
                     file_name=f"result_{i+1}.csv",
                     mime="text/csv",
                     key=f"download_{i}"
                 )
 
-                additional_prompt = st.text_area("Enter additional instructions", key=f"additional_prompt_{i}")
-                reprocess_button = st.button('Reprocess', key=f"reprocess_{i}")
+                additional_prompt = st.text_area("追加の指示を入力", key=f"additional_prompt_{i}")
+                reprocess_button = st.button('再処理', key=f"reprocess_{i}")
                 
                 if reprocess_button:
-                    with st.spinner('Reprocessing...'):
+                    with st.spinner('再処理中...'):
                         try:
                             new_result = process_content(result_data["result"], st.session_state.api_key, additional_prompt, st.session_state.selected_model, is_image=False)
                             if new_result:
                                 st.session_state.results.append({"result": new_result, "prompt": additional_prompt, "model": st.session_state.selected_model})
                         except Exception as e:
-                            st.error(f"An error occurred: {str(e)}")
+                            st.error(f"エラーが発生しました: {str(e)}")
 
     # 新しい結果を表示するためのコードをループの外に移動
     if st.session_state.results:
-        st.subheader("Latest Result")
+        st.subheader("最新の結果")
         latest_result = st.session_state.results[-1]
-        st.text_area("Output", latest_result["result"], height=200, key="latest_output")
+        st.text_area("出力", latest_result["result"], height=200, key="latest_output")
         
         csv_result = clean_csv(latest_result["result"])
         st.download_button(
-            label="Download Latest as CSV",
+            label="最新結果をCSVとしてダウンロード",
             data=csv_result,
             file_name="latest_result.csv",
             mime="text/csv",
