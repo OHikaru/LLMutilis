@@ -278,7 +278,7 @@ def extract_text_from_pdf(pdf_file):
 
 def main():
     st.set_page_config(page_title="AIドキュメント処理システム", page_icon="📄", layout="wide")
-    st.title('AIドキュメント処理 & Q&Aシステム')
+    st.title('AIドキュメント・画像処理 & Q&Aシステム')
 
     # Initialize session state
     if 'content' not in st.session_state:
@@ -293,11 +293,11 @@ def main():
     # Sidebar for configuration
     with st.sidebar:
         st.header("設定")
-        api_key_type = st.radio("APIキーの種類を選択", ("Gemini", "OpenAI"))
+        api_key_type = st.radio("APIキーの種類を選択してください。", ("Gemini", "OpenAI"))
         api_key = st.text_input(f"{api_key_type} APIキー", type="password", value=st.session_state.api_key)
         
         models = GEMINI_MODELS if api_key_type == "Gemini" else OPENAI_MODELS
-        selected_model = st.selectbox("AIモデルを選択", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
+        selected_model = st.selectbox("AIモデルを選択してください。\n\n OCRのおすすめはmodels/gemini-1.5-pro-002です", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
         
         st.session_state.api_key = api_key
         st.session_state.selected_model = selected_model
@@ -307,7 +307,7 @@ def main():
 
     with col1:
         st.subheader("入力")
-        input_type = st.radio("入力タイプを選択", ("テキスト", "画像/PDF"))
+        input_type = st.radio("入力のタイプを選択してください。", ("テキスト", "画像/PDF"))
 
         if input_type == "テキスト":
             user_input = st.text_area("質問や処理したいテキストを入力してください")
@@ -322,8 +322,8 @@ def main():
                     except Exception as e:
                         st.error(f"エラーが発生しました: {str(e)}")
         else:
-            initial_prompt = st.text_area("初期指示を入力（任意）")
-            uploaded_file = st.file_uploader("画像またはPDFファイルを選択", type=["jpg", "jpeg", "png", "pdf"])
+            initial_prompt = st.text_area("追加で指示したい内容があれば入力してください（オプション）")
+            uploaded_file = st.file_uploader("画像またはPDFファイルを選択してください。", type=["jpg", "jpeg", "png", "pdf"])
 
             if uploaded_file:
                 if uploaded_file.type.startswith('image'):
@@ -379,7 +379,7 @@ def main():
 
     # 新しい結果を表示するためのコードをループの外に移動
     if st.session_state.results:
-        st.subheader("最新の結果")
+        st.subheader("いちばん最新の結果")
         latest_result = st.session_state.results[-1]
         st.text_area("出力", latest_result["result"], height=200, key="latest_output")
         
