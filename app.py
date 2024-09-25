@@ -29,7 +29,7 @@ GEMINI_MODELS = [
     "models/gemini-1.5-flash-exp-0827",
     "models/gemini-1.5-flash-8b-exp-0827",
     "models/gemini-1.5-flash-8b-exp-0924",
-    "models/gemini-1.5-flash-002,
+    "models/gemini-1.5-flash-002",
 ]
 
 OPENAI_MODELS = [
