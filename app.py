@@ -323,7 +323,7 @@ def main():
                         st.error(f"エラーが発生しました: {str(e)}")
         else:
             initial_prompt = st.text_area("追加で指示したい内容があれば入力してください（オプション）")
-            uploaded_file = st.file_uploader("画像またはPDFファイルを選択してください。", type=["jpg", "jpeg", "png", "pdf"])
+            uploaded_file = st.file_uploader("画像またはPDFファイルを選択してください。", type=["jpg", "jpeg", "png", "pdf", "tiff", "bmp", "webp"])
 
             if uploaded_file:
                 if uploaded_file.type.startswith('image'):
