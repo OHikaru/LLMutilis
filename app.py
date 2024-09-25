@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_MODELS = [
-    "models/gemini-1.5-pro-002"
+    "models/gemini-1.5-pro-002",
     "models/gemini-pro-vision",
     "models/gemini-1.5-pro-latest",
     "models/gemini-1.5-pro-001",
