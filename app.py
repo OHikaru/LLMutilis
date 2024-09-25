@@ -323,7 +323,7 @@ def main():
                         st.error(f"エラーが発生しました: {str(e)}")
         else:
             initial_prompt = st.text_area("追加で指示したい内容があれば入力してください（オプション）")
-            uploaded_file = st.file_uploader("画像またはPDFファイルを選択してください。", type=["jpg", "jpeg", "png", "pdf", "tiff", "bmp", "webp"])
+            uploaded_file = st.file_uploader("画像またはPDFファイルを選択してください。\n\n 画像はJPG、JPEG、PNG、TIFF、BMP、WEBPに対応しています。", type=["jpg", "jpeg", "png", "pdf", "tiff", "bmp", "webp"])
 
             if uploaded_file:
                 if uploaded_file.type.startswith('image'):
@@ -365,7 +365,7 @@ def main():
                     key=f"download_{i}"
                 )
 
-                additional_prompt = st.text_area("追加の指示を入力", key=f"additional_prompt_{i}")
+                additional_prompt = st.text_area("追加の指示を入力してください", key=f"additional_prompt_{i}")
                 reprocess_button = st.button('再処理', key=f"reprocess_{i}")
                 
                 if reprocess_button:
@@ -379,7 +379,7 @@ def main():
 
     # 新しい結果を表示するためのコードをループの外に移動
     if st.session_state.results:
-        st.subheader("いちばん最新の結果")
+        st.subheader("最新の出力結果")
         latest_result = st.session_state.results[-1]
         st.text_area("出力", latest_result["result"], height=200, key="latest_output")
         
